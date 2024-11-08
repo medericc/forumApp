@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 class Reply {
   final int id;
   final int userId;
@@ -15,13 +17,15 @@ class Reply {
     required this.likeCount, // Ajout du champ likeCount au constructeur
   });
 
-  factory Reply.fromJson(Map<String, dynamic> json) {
-    DateTime createdAt;
-    try {
-      createdAt = DateTime.parse(json['created_at']);
-    } catch (e) {
-      createdAt = DateTime.now();
-    }
+factory Reply.fromJson(Map<String, dynamic> json) {
+  DateTime createdAt;
+  try {
+    // Attempt to parse with the specific format: "EEE, dd MMM yyyy HH:mm:ss zzz"
+    createdAt = DateFormat("EEE, dd MMM yyyy HH:mm:ss zzz").parse(json['created_at']);
+  } catch (e) {
+    print('Failed to parse created_at: ${json['created_at']} - Error: $e');
+    createdAt = DateTime.now();  // Use the current date as a fallback
+  }
 
     return Reply(
       id: json['id'],

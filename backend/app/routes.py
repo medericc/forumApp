@@ -2,8 +2,14 @@ from flask import Blueprint, jsonify, request
 from .db import get_db_connection
 import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_cors import CORS
+from flask_cors import cross_origin
+
 
 bp = Blueprint('routes', __name__)
+
+# Apply CORS to all routes within this blueprint
+CORS(bp, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
 # Route pour obtenir la liste des utilisateurs
 @bp.route('/users', methods=['GET'])
@@ -165,6 +171,7 @@ def delete_reply(reply_id):
         cursor.close()
         conn.close()
 
+
 @bp.route('/reply_likes', methods=['POST'])
 def add_reply_like():
     data = request.get_json()
@@ -175,7 +182,7 @@ def add_reply_like():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Vérifier si un like existe déjà pour éviter les doublons
+        # Check if a like already exists to avoid duplicates
         cursor.execute(
             "SELECT * FROM reply_likes WHERE reply_id = %s AND user_id = %s", 
             (reply_id, user_id)
@@ -185,7 +192,7 @@ def add_reply_like():
         if existing_like:
             return jsonify({"message": "Like déjà ajouté"}), 400
 
-        # Ajouter le like
+        # Add the like
         sql = "INSERT INTO reply_likes (reply_id, user_id, created_at) VALUES (%s, %s, NOW())"
         cursor.execute(sql, (reply_id, user_id))
         conn.commit()

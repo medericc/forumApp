@@ -145,9 +145,14 @@ Future<void> addReplyLike(int replyId, int userId) async {
     headers: {'Content-Type': 'application/json'},
   );
 
-  if (response.statusCode != 200) {
-    throw Exception('Erreur lors de l\'ajout du like.');
-  }
+ if (response.statusCode == 201) {
+  print('Like ajouté avec succès !');
+} else {
+  print('Erreur lors de l\'ajout du like : ${response.statusCode}');
+  print('Contenu de la réponse : ${response.body}');
+  throw Exception('Erreur lors de l\'ajout du like.');
+}
+
 }
 
   
