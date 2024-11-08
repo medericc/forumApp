@@ -164,3 +164,37 @@ def delete_reply(reply_id):
     finally:
         cursor.close()
         conn.close()
+
+@bp.route('/reply_likes', methods=['POST'])
+def add_reply_like():
+    data = request.get_json()
+    reply_id = data.get('reply_id')
+    user_id = data.get('user_id')
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Vérifier si un like existe déjà pour éviter les doublons
+        cursor.execute(
+            "SELECT * FROM reply_likes WHERE reply_id = %s AND user_id = %s", 
+            (reply_id, user_id)
+        )
+        existing_like = cursor.fetchone()
+        
+        if existing_like:
+            return jsonify({"message": "Like déjà ajouté"}), 400
+
+        # Ajouter le like
+        sql = "INSERT INTO reply_likes (reply_id, user_id, created_at) VALUES (%s, %s, NOW())"
+        cursor.execute(sql, (reply_id, user_id))
+        conn.commit()
+
+        return jsonify({"message": "Like ajouté avec succès"}), 201
+
+    except mysql.connector.Error as err:
+        return jsonify({"error": "Erreur lors de l'ajout du like"}), 500
+    
+    finally:
+        cursor.close()
+        conn.close()

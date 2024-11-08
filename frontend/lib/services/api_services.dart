@@ -137,5 +137,18 @@ Future<void> deleteReply(int replyId, int userId, String userRole) async {
   }
 }
 
+Future<void> addReplyLike(int replyId, int userId) async {
+  // Assurez-vous que l'URL et les paramètres correspondent à votre API
+  final response = await http.post(
+    Uri.parse('$baseUrl/reply_likes'),
+    body: jsonEncode({'reply_id': replyId, 'user_id': userId}),
+    headers: {'Content-Type': 'application/json'},
+  );
+
+  if (response.statusCode != 200) {
+    throw Exception('Erreur lors de l\'ajout du like.');
+  }
+}
+
   
 }

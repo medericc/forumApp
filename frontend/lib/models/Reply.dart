@@ -1,34 +1,35 @@
 class Reply {
   final int id;
   final int userId;
-  final String username; // Ajout du champ username
+  final String username;
   final String description;
   final DateTime createdAt;
+  final int likeCount; // Ajout du champ likeCount
 
   Reply({
     required this.id,
     required this.userId,
-    required this.username, // Ajout du champ username au constructeur
+    required this.username,
     required this.description,
     required this.createdAt,
+    required this.likeCount, // Ajout du champ likeCount au constructeur
   });
 
   factory Reply.fromJson(Map<String, dynamic> json) {
-    // Essayer de parser la date, sinon renvoyer une date par défaut
     DateTime createdAt;
     try {
       createdAt = DateTime.parse(json['created_at']);
     } catch (e) {
-      print("Error parsing date: ${json['created_at']}");
-      createdAt = DateTime.now(); // Ou toute autre valeur par défaut
+      createdAt = DateTime.now();
     }
 
     return Reply(
       id: json['id'],
       userId: json['user_id'],
-      username: json['username'], // Extraction du username depuis le JSON
+      username: json['username'],
       description: json['description'],
       createdAt: createdAt,
+      likeCount: json['like_count'] ?? 0, // Extraire le likeCount depuis le JSON
     );
   }
 
@@ -36,9 +37,10 @@ class Reply {
     return {
       'id': id,
       'user_id': userId,
-      'username': username, // Ajout du champ username au JSON
+      'username': username,
       'description': description,
       'created_at': createdAt.toIso8601String(),
+      'like_count': likeCount, // Inclure le champ likeCount dans le JSON
     };
   }
 }

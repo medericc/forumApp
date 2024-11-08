@@ -223,6 +223,23 @@ Future<bool> _registerUser(String username, String password, String adminCode) a
 
   return response.statusCode == 201;
 }
+ Future<void> _likeReply(int replyId) async {
+    if (!isLoggedIn) {
+      _showLoginDialog(context); // Demande de connexion si non connecté
+      return;
+    }
+
+    try {
+      await ApiService().addReplyLike(replyId, int.parse(userId!));
+      setState(() {
+        futureReplies = ApiService().getReplies(widget.topic.id);
+      });
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur lors de l\'ajout du like. Veuillez réessayer.'),
+      ));
+    }
+  }
 
 
   @override
@@ -275,94 +292,113 @@ Future<bool> _registerUser(String username, String password, String adminCode) a
  SizedBox(height: 5.0),
             Text('Date: ${widget.topic.createdAt}'),
             SizedBox(height: 32.0),
-            Expanded(
-              child: FutureBuilder<List<reply_model.Reply>>(
-                future: futureReplies,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Erreur: ${snapshot.error}'));
-                  } else if (snapshot.hasData) {
-                    if (snapshot.data!.isEmpty) {
-                      return Center(child: Text('Pas de réponses pour le moment'));
-                    } else {
-                      List<reply_model.Reply> replies = snapshot.data!;
-                      return ListView.builder(
-                        itemCount: replies.length,
-                        itemBuilder: (context, index) {
-                          return Card(
-                            margin: EdgeInsets.symmetric(vertical: 8.0),
-                            child: ListTile(
-                              
-                             title: Text('${replies[index].username}',style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
-                            
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                   SizedBox(height: 11.0),
-                                  Text(replies[index].description),
-                                  Text('Posté le ${replies[index].createdAt}'),
-                                FutureBuilder<String?>(
-  future: AuthService().getUserId(),
-  builder: (context, snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return CircularProgressIndicator();
-    } else if (snapshot.hasError) {
-      return Text('Erreur lors de la vérification de l\'utilisateur');
-    } else if (snapshot.hasData) {
-      String currentUserId = snapshot.data!;
-      // Check if logged in and if the role is 'admin' or the user is the reply's owner
-      if (isLoggedIn && (userRole == 'admin' || replies[index].userId.toString() == currentUserId)) {
-        return TextButton(
-          onPressed: () async {
-            try {
-              await ApiService().deleteReply(replies[index].id, replies[index].userId, userRole!);
-              setState(() {
-                futureReplies = ApiService().getReplies(widget.topic.id);
-              });
-            } catch (error) {
-              print('Failed to delete reply: $error');
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Failed to delete reply. Please try again.'),
-              ));
-            }
-          },
-          child: Text('Supprimer', style: TextStyle(color: Colors.red)),
-        );
+   Expanded(
+  child: FutureBuilder<List<reply_model.Reply>>(
+    future: futureReplies,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      } else if (snapshot.hasError) {
+        return Center(child: Text('Erreur: ${snapshot.error}'));
+      } else if (snapshot.hasData) {
+        if (snapshot.data!.isEmpty) {
+          return const Center(child: Text('Pas de réponses pour le moment'));
+        } else {
+          List<reply_model.Reply> replies = snapshot.data!;
+          return ListView.builder(
+            itemCount: replies.length,
+            itemBuilder: (context, index) {
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ListTile(
+                  title: Text(
+                    '${replies[index].username}',
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 11.0),
+                      Text(replies[index].description),
+                      Text('Posté le ${replies[index].createdAt}'),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.thumb_up),
+                            color: Colors.blue,
+                            onPressed: () => _likeReply(replies[index].id),
+                          ),
+                          Text('${replies[index].likeCount}'), // Affiche le nombre de likes
+                        ],
+                      ),
+                      FutureBuilder<String?>(
+                        future: AuthService().getUserId(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const CircularProgressIndicator();
+                          } else if (snapshot.hasError) {
+                            return const Text('Erreur lors de la vérification de l\'utilisateur');
+                          } else if (snapshot.hasData) {
+                            String currentUserId = snapshot.data!;
+                            // Vérifie si l'utilisateur est connecté et a les droits pour supprimer la réponse
+                            if (isLoggedIn && 
+                               (userRole == 'admin' || replies[index].userId.toString() == currentUserId)) {
+                              return TextButton(
+                                onPressed: () async {
+                                  try {
+                                    await ApiService().deleteReply(
+                                      replies[index].id,
+                                      replies[index].userId,
+                                      userRole!,
+                                    );
+                                    setState(() {
+                                      futureReplies = ApiService().getReplies(widget.topic.id);
+                                    });
+                                  } catch (error) {
+                                    print('Erreur lors de la suppression de la réponse: $error');
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                      content: Text('Erreur lors de la suppression. Réessayez.'),
+                                    ));
+                                  }
+                                },
+                                child: const Text(
+                                  'Supprimer',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              );
+                            }
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        }
+      } else {
+        return const Center(child: Text('Pas de réponses pour le moment'));
       }
-    }
-    return SizedBox.shrink();
-  },
+    },
+  ),
+),
+const SizedBox(height: 16.0),
+TextField(
+  controller: _replyController,
+  decoration: const InputDecoration(
+    labelText: 'Votre réponse',
+    border: OutlineInputBorder(),
+  ),
+  maxLines: 3,
+),
+const SizedBox(height: 16.0),
+ElevatedButton(
+  onPressed: _addReply,
+  child: const Text('Envoyer'),
 ),
 
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }
-                  } else {
-                    return Center(child: Text('Pas de réponses pour le moment'));
-                  }
-                },
-              ),
-            ),
-            SizedBox(height: 16.0),
-            TextField(
-              controller: _replyController,
-              decoration: InputDecoration(
-                labelText: 'Votre réponse',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-            SizedBox(height: 16.0),
-            ElevatedButton(
-              onPressed: _addReply,
-              child: Text('Envoyer'),
-            ),
           ],
         ),
       ),
