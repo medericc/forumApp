@@ -18,6 +18,7 @@ class TopicDetailScreen extends StatefulWidget {
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
   late TextEditingController _replyController;
   late Future<List<reply_model.Reply>> futureReplies;
+  String sortOption = 'Most Recent'; // Default sort option
   bool isLoggedIn = false;
   String? userRole; // Variable to store user role
   String? userId; // Variable to store user ID
@@ -42,6 +43,13 @@ void _checkLoginStatus() async {
   });
 }
 
+  void _sortReplies(List<reply_model.Reply> replies) {
+    if (sortOption == 'Most Recent') {
+      replies.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    } else if (sortOption == 'Most Likes') {
+      replies.sort((a, b) => b.likeCount.compareTo(a.likeCount));
+    }
+  }
 
   @override
   void dispose() {
@@ -292,6 +300,33 @@ Future<bool> _registerUser(String username, String password, String adminCode) a
  SizedBox(height: 5.0),
             Text('Date: ${widget.topic.createdAt}'),
             SizedBox(height: 32.0),
+
+               Row(
+            children: [
+              Text('Trier par: '),
+              SizedBox(width: 8.0),
+              DropdownButton<String>(
+                value: sortOption,
+                onChanged: (String? newValue) {
+                  setState(() {
+                    sortOption = newValue!;
+                    // Re-fetch and re-sort replies based on the selected criterion
+                    futureReplies = ApiService().getReplies(widget.topic.id);
+                  });
+                },
+                items: <String>['Most Recent', 'Most Likes']
+                    .map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          
+          SizedBox(height: 16.0),
+          
    Expanded(
   child: FutureBuilder<List<reply_model.Reply>>(
     future: futureReplies,
