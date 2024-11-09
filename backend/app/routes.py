@@ -200,6 +200,7 @@ def add_reply_like():
         return jsonify({"message": "Like ajouté avec succès"}), 201
 
     except mysql.connector.Error as err:
+        print(f"Error: {err}")
         return jsonify({"error": "Erreur lors de l'ajout du like"}), 500
     
     finally:
