@@ -231,6 +231,7 @@ Future<bool> _registerUser(String username, String password, String adminCode) a
 
   return response.statusCode == 201;
 }
+
  Future<void> _likeReply(int replyId) async {
     if (!isLoggedIn) {
       _showLoginDialog(context); // Demande de connexion si non connecté

@@ -138,22 +138,46 @@ Future<void> deleteReply(int replyId, int userId, String userRole) async {
 }
 
 Future<void> addReplyLike(int replyId, int userId) async {
-  // Assurez-vous que l'URL et les paramètres correspondent à votre API
-  final response = await http.post(
-    Uri.parse('$baseUrl/reply_likes'),
-    body: jsonEncode({'reply_id': replyId, 'user_id': userId}),
-    headers: {'Content-Type': 'application/json'},
-  );
+   try {
+    // Étape 1 : Vérifier si le "like" existe déjà avec une requête GET
+    final checkResponse = await http.get(
+      Uri.parse('$baseUrl/reply_likes/$replyId/$userId'),
+    );
 
- if (response.statusCode == 201) {
-  print('Like ajouté avec succès !');
-} else {
-  print('Erreur lors de l\'ajout du like : ${response.statusCode}');
-  print('Contenu de la réponse : ${response.body}');
-  throw Exception('Erreur lors de l\'ajout du like.');
+    if (checkResponse.statusCode == 200) {
+      // Le "like" existe, donc on le retire avec une requête DELETE
+      final deleteResponse = await http.delete(
+        Uri.parse('$baseUrl/reply_likes/$replyId/$userId'),
+      );
+
+      if (deleteResponse.statusCode == 200) {
+        print('Like retiré avec succès !');
+      } else {
+        print('Erreur lors du retrait du like : ${deleteResponse.statusCode}');
+        throw Exception('Erreur lors du retrait du like.');
+      }
+    } else if (checkResponse.statusCode == 404) {
+      // Le "like" n'existe pas, donc on l'ajoute avec une requête POST
+      final addResponse = await http.post(
+        Uri.parse('$baseUrl/reply_likes'),
+        body: jsonEncode({'reply_id': replyId, 'user_id': userId}),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (addResponse.statusCode == 201) {
+        print('Like ajouté avec succès !');
+      } else {
+        print('Erreur lors de l\'ajout du like : ${addResponse.statusCode}');
+        throw Exception('Erreur lors de l\'ajout du like.');
+      }
+    } else {
+      print('Erreur lors de la vérification du like : ${checkResponse.statusCode}');
+      throw Exception('Erreur lors de la vérification du like.');
+    }
+  } catch (error) {
+    print('Erreur lors de la bascule du like: $error');
+    throw Exception('Erreur lors de la bascule du like.');
+  }
 }
-
-}
-
   
 }

@@ -171,6 +171,31 @@ def delete_reply(reply_id):
         cursor.close()
         conn.close()
 
+@bp.route('/reply_likes/<int:reply_id>/<int:user_id>', methods=['GET'])
+def check_reply_like(reply_id, user_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Vérifie si un "like" existe pour ce reply_id et user_id
+        cursor.execute(
+            "SELECT * FROM reply_likes WHERE reply_id = %s AND user_id = %s", 
+            (reply_id, user_id)
+        )
+        existing_like = cursor.fetchone()
+
+        if existing_like:
+            return jsonify({"message": "Like existe"}), 200
+        else:
+            return jsonify({"message": "Like n'existe pas"}), 404
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return jsonify({"error": "Erreur lors de la vérification du like"}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
 
 @bp.route('/reply_likes', methods=['POST'])
 def add_reply_like():
@@ -203,6 +228,28 @@ def add_reply_like():
         print(f"Error: {err}")
         return jsonify({"error": "Erreur lors de l'ajout du like"}), 500
     
+    finally:
+        cursor.close()
+        conn.close()
+@bp.route('/reply_likes/<int:reply_id>/<int:user_id>', methods=['DELETE'])
+def remove_reply_like(reply_id, user_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Supprime le like
+        cursor.execute(
+            "DELETE FROM reply_likes WHERE reply_id = %s AND user_id = %s", 
+            (reply_id, user_id)
+        )
+        conn.commit()
+
+        return jsonify({"message": "Like retiré avec succès"}), 200
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return jsonify({"error": "Erreur lors du retrait du like"}), 500
+
     finally:
         cursor.close()
         conn.close()
