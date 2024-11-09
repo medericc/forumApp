@@ -26,6 +26,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
   void initState() {
     super.initState();
     _checkLoginStatus();
+    
     futureTopics = ApiService().getTopicsByCategory(widget.categoryId).then((topics) {
       allTopics = topics ?? [];
       filteredTopics = allTopics;
@@ -40,30 +41,34 @@ class _TopicListScreenState extends State<TopicListScreen> {
     setState(() {});
   }
 
-  void _deleteTopic(int topicId, int topicOwnerId) async {
-    if (userId != null && userRole != null) {
-      try {
-        if (userRole == 'admin' || userRole == 'moderator' || int.parse(userId!) == topicOwnerId) {
-          await ApiService().deleteTopic(topicId, int.parse(userId!), userRole!);
-          setState(() {
-            futureTopics = ApiService().getTopicsByCategory(widget.categoryId);
-          });
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Sujet supprimé avec succès.'),
-          ));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Vous n\'avez pas les permissions nécessaires pour supprimer ce sujet.'),
-          ));
-        }
-      } catch (error) {
-        print('Échec de la suppression du sujet: $error');
+void _deleteTopic(int topicId, int topicOwnerId) async {
+  if (userId != null && userRole != null) {
+    try {
+      if (userRole == 'admin' || userRole == 'moderator' || int.parse(userId!) == topicOwnerId) {
+        await ApiService().deleteTopic(topicId, int.parse(userId!), userRole!);
+        
+        setState(() {
+          allTopics.removeWhere((topic) => topic.id == topicId);
+          filteredTopics.removeWhere((topic) => topic.id == topicId);
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Échec de la suppression du sujet. Veuillez réessayer.'),
+          content: Text('Sujet supprimé avec succès.'),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Vous n\'avez pas les permissions nécessaires pour supprimer ce sujet.'),
         ));
       }
+    } catch (error) {
+      print('Échec de la suppression du sujet: $error');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Échec de la suppression du sujet. Veuillez réessayer.'),
+      ));
     }
   }
+}
+
 
   // Fonction de filtre pour mettre à jour les sujets en fonction de la recherche
   void _filterTopics(String query) {
