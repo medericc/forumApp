@@ -17,52 +17,66 @@ class _TopicListScreenState extends State<TopicListScreen> {
   late Future<List<Topic>> futureTopics;
   bool isLoggedIn = false;
   String? userId;
-  String? userRole; // Ajoutez une variable pour le rôle de l'utilisateur
+  String? userRole;
+  TextEditingController searchController = TextEditingController();
+  List<Topic> allTopics = []; // Pour stocker tous les sujets non filtrés
+  List<Topic> filteredTopics = []; // Pour stocker les sujets filtrés
 
   @override
   void initState() {
     super.initState();
     _checkLoginStatus();
     futureTopics = ApiService().getTopicsByCategory(widget.categoryId).then((topics) {
-      return topics ?? []; // Retourner une liste vide si 'topics' est null
+      allTopics = topics ?? [];
+      filteredTopics = allTopics;
+      return allTopics;
     });
   }
 
-  // Méthode pour vérifier si l'utilisateur est connecté
   void _checkLoginStatus() async {
     isLoggedIn = await AuthService().isLoggedIn;
     userId = await AuthService().getUserId();
-    userRole = await AuthService().getRole(); // Récupérez le rôle de l'utilisateur
+    userRole = await AuthService().getRole();
     setState(() {});
   }
 
-  // Méthode pour supprimer un sujet
-void _deleteTopic(int topicId, int topicOwnerId) async {
-  if (userId != null && userRole != null) {
-    try {
-      // Vérification de permissions
-      if (userRole == 'admin' || userRole == 'moderator' || int.parse(userId!) == topicOwnerId) {
-        await ApiService().deleteTopic(topicId, int.parse(userId!), userRole!);
-        setState(() {
-          futureTopics = ApiService().getTopicsByCategory(widget.categoryId);
-        });
+  void _deleteTopic(int topicId, int topicOwnerId) async {
+    if (userId != null && userRole != null) {
+      try {
+        if (userRole == 'admin' || userRole == 'moderator' || int.parse(userId!) == topicOwnerId) {
+          await ApiService().deleteTopic(topicId, int.parse(userId!), userRole!);
+          setState(() {
+            futureTopics = ApiService().getTopicsByCategory(widget.categoryId);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Sujet supprimé avec succès.'),
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Vous n\'avez pas les permissions nécessaires pour supprimer ce sujet.'),
+          ));
+        }
+      } catch (error) {
+        print('Échec de la suppression du sujet: $error');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Sujet supprimé avec succès.'),
-        ));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Vous n\'avez pas les permissions nécessaires pour supprimer ce sujet.'),
+          content: Text('Échec de la suppression du sujet. Veuillez réessayer.'),
         ));
       }
-    } catch (error) {
-      print('Échec de la suppression du sujet: $error');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Échec de la suppression du sujet. Veuillez réessayer.'),
-      ));
     }
   }
-}
 
+  // Fonction de filtre pour mettre à jour les sujets en fonction de la recherche
+  void _filterTopics(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        filteredTopics = allTopics;
+      } else {
+        filteredTopics = allTopics
+            .where((topic) => topic.title.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,60 +84,76 @@ void _deleteTopic(int topicId, int topicOwnerId) async {
       appBar: AppBar(
         title: Text('Liste des sujets'),
       ),
-      body: FutureBuilder<List<Topic>>(
-        future: futureTopics,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Erreur: ${snapshot.error}'));
-          } else if (snapshot.hasData) {
-            List<Topic> topics = snapshot.data!.reversed.toList();
-;
-            return ListView.builder(
-              itemCount: topics.length,
-              itemBuilder: (context, index) {
-                final topic = topics[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  elevation: 4.0,
-                  child: ListTile(
-                    title: Text(
-                      topic.title,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Auteur: ${topic.username}'),
-                        Text('Date: ${topic.createdAt}'),
-                      ],
-                    ),
-                 trailing: isLoggedIn &&
-  (userRole == 'admin' || userRole == 'moderator' || topic.userId.toString() == userId)
-    ? IconButton(
-        icon: Icon(Icons.delete, color: Colors.red),
-        onPressed: () => _deleteTopic(topic.id, topic.userId),
-      )
-    : null,
-
-                    onTap: () {
-                      print('Topic User ID: ${topic.userId}, Logged in User ID: $userId, isLoggedIn: $isLoggedIn');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TopicDetailScreen(topic: topic),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: searchController,
+              onChanged: _filterTopics,
+              decoration: InputDecoration(
+                labelText: 'Rechercher un sujet',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<Topic>>(
+              future: futureTopics,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Erreur: ${snapshot.error}'));
+                } else if (snapshot.hasData) {
+                  return ListView.builder(
+                    itemCount: filteredTopics.length,
+                    itemBuilder: (context, index) {
+                      final topic = filteredTopics[index];
+                      return Card(
+                        margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        elevation: 4.0,
+                        child: ListTile(
+                          title: Text(
+                            topic.title,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Auteur: ${topic.username}'),
+                              Text('Date: ${topic.createdAt}'),
+                            ],
+                          ),
+                          trailing: isLoggedIn &&
+                                  (userRole == 'admin' ||
+                                      userRole == 'moderator' ||
+                                      topic.userId.toString() == userId)
+                              ? IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _deleteTopic(topic.id, topic.userId),
+                                )
+                              : null,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TopicDetailScreen(topic: topic),
+                              ),
+                            );
+                          },
                         ),
                       );
                     },
-                  ),
-                );
+                  );
+                } else {
+                  return Center(child: Text('Aucun sujet trouvé'));
+                }
               },
-            );
-          } else {
-            return Center(child: Text('Aucun sujet trouvé'));
-          }
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
