@@ -82,15 +82,45 @@ def add_reply():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # Ajouter la réponse
         sql = "INSERT INTO reply (topic_id, user_id, description, created_at) VALUES (%s, %s, %s, NOW())"
         cursor.execute(sql, (topic_id, user_id, description))
         conn.commit()
-        cursor.close()
-        conn.close()
-        return jsonify({"message": "Réponse ajoutée avec succès"}), 201
+
+        # Récupérer l'auteur du topic
+        cursor.execute("SELECT user_id FROM topics WHERE id = %s", (topic_id,))
+        topic_author = cursor.fetchone()
+
+        # Créer une notification pour l'auteur du topic
+        if topic_author and topic_author[0] != user_id:  # Éviter de notifier l'auteur de la réponse
+            message = "Votre topic a reçu une nouvelle réponse."
+            cursor.execute(
+                "INSERT INTO notifications (user_id, topic_id, message, created_at) VALUES (%s, %s, %s, NOW())",
+                (topic_author[0], topic_id, message)
+            )
+
+        # Créer une notification pour les autres utilisateurs ayant déjà répondu
+        cursor.execute("SELECT DISTINCT user_id FROM reply WHERE topic_id = %s AND user_id != %s", (topic_id, user_id))
+        responders = cursor.fetchall()
+
+        for responder in responders:
+            message = "Un topic auquel vous avez répondu a une nouvelle réponse."
+            cursor.execute(
+                "INSERT INTO notifications (user_id, topic_id, message, created_at) VALUES (%s, %s, %s, NOW())",
+                (responder[0], topic_id, message)
+            )
+
+        conn.commit()
+        return jsonify({"message": "Réponse ajoutée avec succès et notifications envoyées"}), 201
+
     except mysql.connector.Error as err:
         print(f"Erreur: {err}")
         return jsonify({"error": "Erreur lors de l'ajout de la réponse"}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # Route to get replies for a specific topic
 @bp.route('/replies/<int:topic_id>', methods=['GET'])
@@ -251,6 +281,7 @@ def add_reply_like():
     finally:
         cursor.close()
         conn.close()
+
 @bp.route('/reply_likes/<int:reply_id>/<int:user_id>', methods=['DELETE'])
 def remove_reply_like(reply_id, user_id):
     try:
@@ -273,3 +304,12 @@ def remove_reply_like(reply_id, user_id):
     finally:
         cursor.close()
         conn.close()
+@bp.route('/notifications/<int:user_id>', methods=['GET'])
+def get_notifications(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM notifications WHERE user_id = %s AND is_read = FALSE ORDER BY created_at DESC", (user_id,))
+    notifications = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return jsonify(notifications)
