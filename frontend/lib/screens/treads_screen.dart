@@ -308,13 +308,16 @@ Future<bool> _registerUser(String username, String password, String adminCode) a
               SizedBox(width: 8.0),
               DropdownButton<String>(
                 value: sortOption,
-                onChanged: (String? newValue) {
-                  setState(() {
-                    sortOption = newValue!;
-                    // Re-fetch and re-sort replies based on the selected criterion
-                    futureReplies = ApiService().getReplies(widget.topic.id);
-                  });
-                },
+              onChanged: (String? newValue) {
+  setState(() {
+    sortOption = newValue!;
+    futureReplies = ApiService().getReplies(widget.topic.id).then((replies) {
+      _sortReplies(replies); // Tri les réponses en fonction de l'option sélectionnée
+      return replies;
+    });
+  });
+},
+
                 items: <String>['Most Recent', 'Most Likes']
                     .map<DropdownMenuItem<String>>((String value) {
                   return DropdownMenuItem<String>(
@@ -332,7 +335,7 @@ Future<bool> _registerUser(String username, String password, String adminCode) a
   child: FutureBuilder<List<reply_model.Reply>>(
     future: futureReplies,
     builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
         return const Center(child: CircularProgressIndicator());
       } else if (snapshot.hasError) {
         return Center(child: Text('Erreur: ${snapshot.error}'));
@@ -340,7 +343,10 @@ Future<bool> _registerUser(String username, String password, String adminCode) a
         if (snapshot.data!.isEmpty) {
           return const Center(child: Text('Pas de réponses pour le moment'));
         } else {
+          // Trier les réponses avant de les afficher
           List<reply_model.Reply> replies = snapshot.data!;
+          _sortReplies(replies); // Appel de la fonction de tri ici
+         
           return ListView.builder(
             itemCount: replies.length,
             itemBuilder: (context, index) {
