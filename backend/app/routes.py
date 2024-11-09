@@ -112,29 +112,49 @@ def get_replies(topic_id):
 @bp.route('/topics/<int:topic_id>', methods=['DELETE'])
 def delete_topic(topic_id):
     user_id = request.json.get('user_id')
-    user_role = request.json.get('role')  # Récupérer le rôle de l'utilisateur
+    user_role = request.json.get('role')
+
+    print(f"Received delete request for topic_id: {topic_id}, user_id: {user_id}, role: {user_role}")
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # Vérifier si l'utilisateur est le créateur du topic ou un administrateur
+        # Vérifiez que les valeurs nécessaires sont présentes
+        if user_id is None or user_role is None:
+            return jsonify({"message": "Données utilisateur manquantes"}), 400
+
+        # Vérification de permissions
         cursor.execute("SELECT * FROM topics WHERE id = %s", (topic_id,))
         topic = cursor.fetchone()
 
-        if not topic or (topic['user_id'] != user_id and user_role != 'admin'):
+        if not topic:
+            return jsonify({"message": "Topic non trouvé"}), 404
+
+        if topic['user_id'] != user_id and user_role != 'admin':
             return jsonify({"message": "Vous n'avez pas la permission de supprimer ce topic"}), 403
 
-        # Supprimer les réponses associées
+        # Étape 1 : Récupérer tous les IDs des réponses associées au topic
+        cursor.execute("SELECT id FROM reply WHERE topic_id = %s", (topic_id,))
+        reply_ids = [row['id'] for row in cursor.fetchall()]
+
+        # Étape 2 : Supprimer les enregistrements de likes associés aux réponses récupérées
+        if reply_ids:
+            cursor.executemany("DELETE FROM reply_likes WHERE reply_id = %s", [(reply_id,) for reply_id in reply_ids])
+            print(f"Suppression des likes des réponses terminée pour le topic {topic_id}")
+
+        # Étape 3 : Supprimer les réponses associées
         cursor.execute("DELETE FROM reply WHERE topic_id = %s", (topic_id,))
+        print(f"Suppression des réponses terminée pour le topic {topic_id}")
         
-        # Supprimer le topic
+        # Étape 4 : Supprimer le topic
         cursor.execute("DELETE FROM topics WHERE id = %s", (topic_id,))
         conn.commit()
-
+        print("Topic supprimé avec succès")
         return jsonify({"message": "Topic supprimé avec succès"}), 200
 
     except mysql.connector.Error as err:
+        print(f"Erreur MySQL : {err}")
         return jsonify({"error": "Erreur lors de la suppression du topic"}), 500
     
     finally:

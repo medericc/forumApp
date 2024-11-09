@@ -85,7 +85,6 @@ Future<void> addReply(int topicId, int userId, String description) async {
 }
 
 Future<void> deleteTopic(int topicId, int userId, String userRole) async {
-  // Log les paramètres d'entrée
   print('deleteTopic called with topicId: $topicId, userId: $userId, userRole: $userRole');
 
   try {
@@ -96,11 +95,10 @@ Future<void> deleteTopic(int topicId, int userId, String userRole) async {
       },
       body: jsonEncode(<String, dynamic>{
         'user_id': userId,
-        'user_role': userRole,  // Inclure le rôle de l'utilisateur dans le corps de la requête
+        'role': userRole, // Correspond maintenant à la clé attendue côté serveur
       }),
     );
 
-    // Log la réponse du serveur
     print('Server response: ${response.statusCode}');
     print('Response body: ${response.body}');
 
@@ -111,7 +109,6 @@ Future<void> deleteTopic(int topicId, int userId, String userRole) async {
       throw Exception('Failed to delete topic');
     }
   } catch (e) {
-    // Log en cas d'exception
     print('Error occurred while deleting topic: $e');
     throw Exception('Error occurred while deleting topic');
   }
